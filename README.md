@@ -19,7 +19,7 @@ Install python and launch the command prompt.
 
 Type this command.
 
-""" >python main.py """
+` >python main.py `
 
 （uvの練習用にuvで作成しましたが、パッケージを使いませんでした。）
 
