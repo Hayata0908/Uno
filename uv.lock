@@ -1,0 +1,7 @@
+version = 1
+requires-python = ">=3.12.4"
+
+[[package]]
+name = "uno"
+version = "0.1.0"
+source = { virtual = "." }
