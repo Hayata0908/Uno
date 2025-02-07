@@ -1,18 +1,25 @@
-#シンプルUNOゲーム Simple UNO
-##説明
+# シンプルUNOゲーム Simple UNO
+## 説明
 これはコマンドプロンプトでUNOを遊ぶゲームです。
+
 This program is UNO game in command prompt.
+
+
 pythonがあれば遊ぶことができます。
+
 You can play with python.
 
-##遊び方
+## 遊び方
 pythonをインストールしたPCでコマンドプロンプトを立ち上げます。
+
 Install python and launch the command prompt.
 
-以下コマンドを実行します。
+
+ファイルのある場所に移動し、以下コマンドを実行します。
+
 Type this command.
 
-'$ python main.py'
+` >python main.py `
 
 （uvの練習用にuvで作成しましたが、パッケージを使いませんでした。）
 
