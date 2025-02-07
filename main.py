@@ -2,55 +2,164 @@
 # dependencies = [""]
 # ///"""
 import random
+from dataclasses import dataclass, field
 import itertools # type: ignore
 import msvcrt # type: ignore
-from time import sleep
+from time import sleep,time
 
-from AIdesign import AI
+from AIdesign import AI #TBD
 
-class Config():
-    def __init__(self) -> None:
-        self.player_num = 4
-        self.score = [0,0,0,0]
-        self.card_num = 7
-        self.rule = {"after_decide": False,"pile_draw": False, "wildfour_anytime": False}
+@dataclass
+class ConfigArgs():
+    """
+    Data class for Config
 
-    def playerNum(self, num: None|int = None) -> int:
-        if num != None:
-            self.player_num = num
-            self.score = list(itertools.repeat(0, conf_data.playerNum()))
-        return self.player_num
+    Attributes:
+        player_num (int) : number of players
+        card_num (int) : number of hands
+        score (list[int]) : score for all players (length of list is number of player)
+        r_after_decide (bool) : the game continue after 1st winner decide or not
+        r_pile_draw (bool) : player can pile draw or not
+        r_wildfour_anytime (bool) : player can set wild4 anytime or only when the player can't set the other cards.
+    """
+    player_num:int = 4
+    card_num:int = 7
+    score:list = field(default_factory=lambda: [0,0,0,0]) # type: ignore
+    r_after_decide:bool = False
+    r_pile_draw:bool = False
+    r_wildfour_anytime = False
 
-    def cardNum(self, num: None|int = None) -> int:
-        if num != None:
-            self.card_num = num
-        return self.card_num
-
-    def continueRule(self, r:None|bool = None) -> bool:
-        if r != None:
-            self.rule["after_decide"] = r
-        return self.rule["after_decide"]
-
-    def pileDrawRule(self, r: None|bool = None) -> bool:
-        if r != None:
-            self.rule["pile_draw"] = r
-        return self.rule["pile_draw"]
-    
-    def wildAnytimeRule(self, r: None|bool = None) -> bool:
-        if r != None:
-            self.rule["wildfour_anytime"] = r
-        return self.rule["wildfour_anytime"]
-
-class UnoAI(AI):
-    def __init__(self, pattern: int) -> None:
+class UnoCpu(AI):
+    def __init__(self, pattern: list|None = None) -> None:
+        if pattern == None:
+            pattern = [0.4+random.random()*0.6,0.1+random.random()*0.9]
         super().__init__(pattern)
+        self.feels = ("睡眠","従順","悲哀","退屈","安心","不安","愉快","平穏","歓喜","感嘆","興味","恐怖","憤怒","緊張","驚愕")
+        self.now = 7
 
-class Play():
-    def __init__(self, config:Config) -> None:
-        self.player_num = config.playerNum() -1
+    def actRecieve(self,situation,effect=None) -> None:
+        if effect == None:
+            effect = situation
+        super().changeFeel(situation, effect)
+        self.now = self.feels.index(super().changeMove())
+
+    def makeLine(self) -> str:
+        """セリフを作る
+        """
+        act = ""
+        if self.now == 0:
+            act = "Zzz"
+        elif self.now == 1:
+            act = "・・・"
+        elif self.now == 2:
+            act = "あ～ぁ。"
+        elif self.now == 3:
+            if self.pattern[1]>0.5:
+                act = "めんどくさいなぁ。"
+            else:
+                act = "ふあぁあ"
+        elif self.now == 4:
+            act = "ふぅ。"
+        elif self.now == 5:
+            act = "ど、どうしよう、、。"
+        elif self.now == 6:
+            act = "いいね。"
+        elif self.now == 7:
+            if self.pattern[1]>0.6:
+                act = "へぇ。"
+        elif self.now == 8:
+            if self.pattern[1]>0.3:
+                act = "やった!"
+        elif self.now == 9:
+            act = "ほぇえ。"
+        elif self.now == 10:
+            if self.pattern[1]>0.5:
+                act = "面白いね。"
+            else:
+                act = "なるほど。"
+        elif self.now == 11:
+            act = "うぅぅ。"
+        elif self.now == 12:
+            act = "この～！"
+        elif self.now == 13:
+            act = "ドキドキ"
+        elif self.now == 14:
+            act = "ええっ！"
+        return act
+    
+    def makeAct(self) -> bool:
+        """正常な行動を行うか否か
+        """
+        if random.random() < (abs(self.now-7)-1)/10:
+            return False
+        return True
+
+class CpuManager():
+    def __init__(self, num:int) -> None:
+        self.cpus = []
+        self.situation = []
+        for i in range(num):
+            self.cpus.append(UnoCpu())
+            self.situation.append(0.5)
+        self.u_time = 7
+
+    def changeCpuNum(self, num:int) -> None:
+        self.cpus = []
+        for i in range(num):
+            self.cpus.append(UnoCpu())
+
+    def setTurnTime(self, elapsed):
+        self.u_time = (self.u_time + elapsed)/2
+        for cpu in self.cpus:
+            cpu.u_time = self.u_time
+
+    def checkSituation(self, hands:list, score:list):
+        hand_num = list(map(lambda x: len(x), hands))
+        if len(set(hand_num)) == 1:
+            hand_nor = [0.5]*len(hand_num)
+        else:
+            hand_nor = list(map(lambda x: 1-(x-min(hand_num))/(max(hand_num)-min(hand_num)), hand_num))
+        for i, hand in enumerate(hands):
+            if len(hand) == 0:
+                hand_nor[i] = 1
+
+        if len(set(score)) == 1:
+            score_nor = [0.5]*len(score)
+        else:
+            score_nor = list(map(lambda x: 1-(x-min(score))/(max(score)-min(score)), score))
+        self.situation = list((x*2 + y)/3 for x, y in zip(hand_nor, score_nor))[1:]
+
+    def actRecieve(self, effect = None, player = None):
+        if player == None:
+            for ind, cpu in enumerate(self.cpus):
+                cpu.actRecieve(self.situation[ind],effect)
+        else:
+            self.cpus[player-1].actRecieve(self.situation[player-1],effect)
+            #print(self.cpus[player-1].feels[self.cpus[player-1].now])
+
+    def makeLine(self, player: int|None = None):
+        lines=[]
+        if player == None:
+            for ind, cpu in enumerate(self.cpus):
+                line = cpu.makeLine()
+                if line != "":
+                    lines.append("Player " + str(ind+1) + " : " +line)
+            if len(lines) != 0:
+                print(random.choice(lines))
+        else:
+            line = self.cpus[player-1].makeLine()
+            if line != "":
+                print("Player " + str(player) + " : "+ self.cpus[player-1].makeLine())
+
+class UnoPlay():
+    def __init__(self, config:ConfigArgs, cpus:CpuManager) -> None:
+        self.player_num = config.player_num -1
+        self.cpus = cpus
         self.deck:list = self.__makeDeck()
-        self.hand_num = config.cardNum()
-        self.rule = config.rule #after_decide, pile_draw, wildfour_anytime
+        self.hand_num = config.card_num
+        self.r_after_decide = config.r_after_decide
+        self.r_pile_draw = config.r_pile_draw
+        self.r_wildfour_anytime = config.r_wildfour_anytime
         self.hand_list:list = self.__makeHand()
         self.opened:tuple = ('', '')
         self.grave = []
@@ -128,20 +237,23 @@ class Play():
                 print("\nあなたのターンがスキップされました。 Skip Your turn")
             else:
                 print("\nSkip Player"+ str(self.turn) + "\'s turn.")
+                self.cpus.actRecieve(0.3, self.turn)
+                self.cpus.makeLine(self.turn)
             self.changeTurn()
 
-    def drawDeck(self):
+    def drawDeck(self, d_num:int = 1):
         """デッキから1枚引く
         """
-        if len(self.deck) == 0:
+        if len(self.deck) < d_num:
             "山場がなくなったので使用済みカードを使います。 Use used cards for a deck."
             self.deck = self.grave.copy()
             random.shuffle(self.deck) # type: ignore
             self.grave = []
-        self.hand_list[self.turn].append(self.deck.pop())
+        for i in range(d_num):
+            self.hand_list[self.turn].append(self.deck.pop())
 
-    def __cardEffect(self): #文字列や数値などのイミュータブルなオブジェクトは値渡し(変更しても反映されない)
-        effect = ""
+    def __cardeffect(self): #文字列や数値などのイミュータブルなオブジェクトは値渡し(変更しても反映されない)
+        describe = ""
         if self.opened[0] == '🌈':
             if self.turn == 0:
                 color = self.__selector("Decide color R: 🔴, Y: 🟡, G: 🟢, B: 🔵 ->",{'R', 'Y', 'G', 'B'})
@@ -152,7 +264,7 @@ class Play():
                 hand = self.hand_list[self.turn]
                 color = [raw[0] for raw in hand]
                 color = max(set(color),key=color.count)
-                if random.random() <= 0.8 and (color!= '🌈'): # 0.8 -> 経験値で更新したい
+                if self.uno and (color!= '🌈'): # -> 経験値で更新したい
                     self.color = color
                 else:
                     col = random.random()*4 # -> 経験値で更新したい, grave情報で変更させたい
@@ -164,27 +276,27 @@ class Play():
                         self.color = '🟢'
                     elif col <= 4:
                         self.color = '🔵'
-            effect = "color: " + self.color
+            describe = "color: " + self.color
         if self.opened[1] == 'Skip':
             self.skip = True
         elif self.opened[1] == 'Reverse':
-            effect = "\n世界が反転する。。。  The world is reversed...."
+            describe = "\n世界が反転する。。。  The world is reversed...."
             self.reverse = not self.reverse
         elif self.opened[1] == '+2':
             self.stuck += 2
         elif self.opened[1] == '+4':
             self.stuck += 4
-        return effect
+        return describe
     
     def check_hand(self) -> list:
         cans = set()
         hand = self.hand_list[self.turn]
         for i in range(len(hand)):
             if hand[i] == ('🌈','+4'):
-                if self.rule["wildfour_anytime"]:
+                if self.r_wildfour_anytime:
                     cans.add(str(i))
             elif self.stuck > 0:
-                if hand[i][1] == '+2' and self.rule["pile_draw"]:
+                if hand[i][1] == '+2' and self.r_pile_draw:
                     if self.opened[1] == '+2':
                         cans.add(str(i))
                     if hand[i][0] == self.color:
@@ -197,7 +309,7 @@ class Play():
                 elif hand[i][0] == self.color and (self.opened[0] == '🌈'):
                     cans.add(str(i))
         if len(cans) == 0 and (('🌈','+4') in hand):
-            if self.stuck <= 0 or self.rule["pile_draw"]:
+            if self.stuck <= 0 or self.r_pile_draw:
                 cans.add(str(hand.index(('🌈','+4'))))
         return sorted(cans)
 
@@ -206,7 +318,7 @@ class Play():
             self.opened = self.deck.pop()
         else:
             self.opened = self.hand_list[self.turn].pop(num)
-            return self.__cardEffect()
+            return self.__cardeffect()
         self.grave.append(self.opened)
 
     def checkPt(self, card: tuple):
@@ -226,37 +338,39 @@ def selector(question: str, select: set[str]) -> str:
         print("you can't chose it.")
         return selector(question, select)
 
-def config(conf_data):
-    inp = selector("W: 人数変更(Change Player num), E: 手札枚数変更(Change Hand num), R: ルール変更(Change rule) Q: 戻る(Back) ->",{"Q","W","E","R"})
-    if inp == "Q":
+def config(conf_data,cpus):
+    inp = selector("W: 人数変更(Change Player num), E: 手札枚数変更(Change Hand num), R: ルール変更(Change rule) Z: 戻る(Back) ->",{"Z","W","E","R"})
+    if inp == "Z":
         pass
     elif inp == "W":
-        inp = selector("人数入力 (2 ~ 9) 元値 : " + str(conf_data.playerNum()) + " ->",{'2', '3', '4', '5', '6', '7', '8', '9'})
-        conf_data.playerNum(int(inp))
+        inp = selector("人数入力 (2 ~ 9) 元値 : " + str(conf_data.player_num) + " ->",{'2', '3', '4', '5', '6', '7', '8', '9'})
+        conf_data.player_num = int(inp)
+        conf_data.score = [0]*conf_data.player_num
+        cpus.changeCpuNum(conf_data.player_num-1)
     elif inp == "E":
-        inp = selector("手札枚数入力 (3 ~ 10) 元値 : " + str(conf_data.cardNum()) + " ->",{'3', '4', '5', '6', '7', '8', '9', '10'})
-        conf_data.cardNum(int(inp))
+        inp = selector("手札枚数入力 (3 ~ 10) 元値 : " + str(conf_data.card_num) + " ->",{'3', '4', '5', '6', '7', '8', '9', '10'})
+        conf_data.card_num = int(inp)
     elif inp == "R":
         print("A: 1位決定後続行可否ルール変更, D: ドローカードの積み重ねルール変更, F: ドロー4の出せるタイミングルール変更")
-        inp = selector("A: continue after 1st winner decide or not, D: be able to pile draw card or not, F: be able to set +4 card anytime or not(set only you have nothing else) ->",{"D","F"})
+        inp = selector("A: continue after 1st winner decide or not, D: be able to pile draw card or not, F: be able to set +4 card anytime or not(set only you have nothing else) ->",{"A","D","F"})
         if inp == "A":
             inp = selector("1位が決まった後もゲームを続けますか? Y/N ->",{"Y","N"})
             if inp == "Y":
-                conf_data.continueRule(True)
+                conf_data.r_after_decide = True
             else:
-                conf_data.continueRule(False)
+                conf_data.r_after_decide = False
         elif inp == "D":
             inp = selector("ドローカードを積み重ねられるようにしますか? Y/N ->",{"Y","N"})
             if inp == "Y":
-                conf_data.pileDrawRule(True)
+                conf_data.r_pile_draw = True
             else:
-                conf_data.pileDrawRule(False)
+                conf_data.r_pile_draw = False
         elif inp == "F":
             inp = selector("ドロー4をいつでも出せるようにしますか? Y/N ->",{"Y","N"})
             if inp == "Y":
-                conf_data.wildAnytimeRule(True)
+                conf_data.r_wildfour_anytime = True
             else:
-                conf_data.wildAnytimeRule(False)
+                conf_data.r_wildfour_anytime = False
     return
 
 def main(data):
@@ -264,7 +378,7 @@ def main(data):
         print("すでに試合は終了しています。 The game is already done.")
         print("次のゲームへ進む場合はRを選んでください。 Select \'R\' to restart.")
         return data.score
-    print("Q : 一時停止 (pause)")
+    print("q : 一時停止 (pause), c : コメント (comment)")
     print("UNO : 最後の１枚になったとき、打ち込む必要があります。 you have to type this word if you will have last one card.")
     if data.turn == 0:
         print("あなたからスタートします。 You are starter.")
@@ -273,29 +387,59 @@ def main(data):
         print(str(data.turn) + " 番プレーヤーからスタートします。 Start from player" + str(data.turn) + ".")
     print("進めるにはキーを押してください。 Press any key to continue.")
 
+    turn_start = time()
+
     while len(data.hand_list[0]) != 0:
+        data.cpus.checkSituation(data.hand_list,data.score)
+        #data.cpus.actRecieve()
+
         #if msvcrt.kbhit() and msvcrt.getch() == b'q':
         #    break
         key = msvcrt.getch() #キーウェイト 各ターンボタン押すまで待つ
         if key == b'q':
             break
-        """elif key == b'c':
-            inp = selector("コメントしますか? Do you want to say anything? Y/N ->",{"Y","N"})
-            if inp == "Y":
-                inp = selector("",{"",""})"""
+        elif key == b'c':
+            #inp = selector("コメントしますか? Do you want to say anything? Y/N ->",{"Y","N"})
+            #if inp == "Y":
+            inp = selector("0:コメントしない, 1:褒め称える, 2:喜ぶ, 3:煽る, 4:怒る ->",{"0","1","2","3","4","5"})
+            if inp == "0":
+                pass
+            elif inp == "1" or inp == "3":
+                person = selector("どのPlayerに？ " + '/'.join(map(str,list(range(1,data.player_num+1)))) + " ->",set(map(lambda x: str(x),list(range(1,data.player_num+1)))))
+                print("Player"+person+ ("さん、やるじゃん！" if inp == "1" else "、 まじで草ww"))
+                if inp == "1":
+                    data.cpus.actRecieve(1, int(person)-1)
+                    data.cpus.makeLine(int(person))
+                else:
+                    data.cpus.actRecieve(0, int(person)-1)
+                    data.cpus.makeLine(int(person))
+            elif inp == "2":
+                print("やったね～！")
+                data.cpus.actRecieve(0.2)
+                data.cpus.makeLine()
+            elif inp == "4":
+                print("おいこら")
+                data.cpus.actRecieve(0.7)
+                data.cpus.makeLine()
+            else:
+                print("はい。リセット～～。")
+                data.cpus.makeLine()
 
-        effect = ""
+        describe = ""
         hand = data.hand_list[data.turn] #リストは参照渡し
         cans = data.check_hand() #出せる手札の番号
 
         if data.turn == 0:
-            print("\n場のカード : " + str(data.opened) + "  スタック (stuck) : " + str(data.stuck))
+            cpus.setTurnTime(time() - turn_start)
+            print("\n場のカード : " + str(data.opened) + ("  スタック (stuck) : " + str(data.stuck) if data.stuck != 0 else ""))
             if data.opened[0] == '🌈':
                 print("     color : " + data.color)
             print("\nあなたのターンです。 Your turn")
             print("手札 (hand) : " + ",".join(map(str,hand)) + "\n")
+            turn_start = time()
         else:
             print("\nPlayer " + str(data.turn))
+            data.uno = data.cpus.cpus[data.turn-1].makeAct() #Unoチェック
 
         #手札に応じて行動変化
         if len(cans) != 0:
@@ -309,7 +453,7 @@ def main(data):
                     inp = selector(", ".join(map(lambda x: x + ": " + str(hand[int(x)]) ,cans[:-2])) + " ->",set(cans[:-2]))
                 if inp == "P" and data.stuck > 0:
                     print(str(data.stuck)+"枚カードを引きます。 draw cards.")
-                    hand.extend(data.deck[:data.stuck])
+                    data.drawDeck(data.stuck)
                     data.stuck = 0
                 elif inp == "P":
                     print("1枚カードを引きます。 Draw a new card.")
@@ -323,18 +467,24 @@ def main(data):
                                 data.uno = True
                                 inp = "Y"
                             if inp == "Y":
-                                effect = data.setCard(-1)
+                                describe = data.setCard(-1)
                                 print("Set " + str(data.opened))
                 else:
-                    effect = data.setCard(int(inp))
+                    describe = data.setCard(int(inp))
                     print("Set " + str(data.opened))
             else:
-                effect = data.setCard(int(cans[0])) # -> 経験値で更新したい, grave情報で変更させたい
+                #cansにskip, reverseがあれば優先。色変え（wild除く）の選択肢がある場合、手札にその色が多ければ優先。次に数字。最後にwild。
+                #残り手札2枚以下のプレーヤーがいる場合、wild優先。
+                describe = data.setCard(int(cans[0])) # -> 経験値で更新したい, grave情報で変更させたい
+                data.cpus.actRecieve(0.7, data.turn) #自分のターンが来たらうれしいよね？
                 print("Set " + str(data.opened))
         elif data.stuck > 0:
             print(str(data.stuck)+"枚カードを引きます。 Draw "+str(data.stuck)+" cards.")
-            data.hand_list[data.turn].extend(data.deck[:data.stuck-1])
+            data.drawDeck(data.stuck)
             data.stuck = 0
+            if data.turn != 0:
+                data.cpus.actRecieve(0.1, data.turn)
+                data.cpus.makeLine(data.turn)
         else:
             print("出せるカードがないので1枚カードを引きます。 Draw a new card.")
             data.drawDeck()
@@ -347,12 +497,15 @@ def main(data):
                         data.uno = True
                         inp = "Y"
                     if inp == "Y":
-                        effect = data.setCard(-1)
+                        describe = data.setCard(-1)
                         print("Set " + str(data.opened))
             else:
+                data.cpus.actRecieve(0.3, data.turn)
                 cans = data.check_hand()
                 if len(cans) != 0:
-                    effect = data.setCard(-1)
+                    data.cpus.actRecieve(0.8, data.turn)
+                    data.cpus.makeLine(data.turn)
+                    describe = data.setCard(-1)
                     print("I draw and set this. " + str(data.opened))
 
         #残り枚数・Unoチェック
@@ -360,6 +513,14 @@ def main(data):
         if remain == 0:
             if data.rank == 1:
                 rank = "1st"
+                #スタックの確認
+                if data.stuck > 0:
+                    data.changeTurn()
+                    print(("あなたは" if data.turn == 0 else "Player"+str(data.turn)) +"は"+str(data.stuck)+"枚カードを引きました。"+ ("You" if data.turn == 0 else "Player"+str(data.turn)) +" drew "+str(data.stuck)+" cards")
+                    data.drawDeck(data.stuck)
+                    data.reverse = not data.reverse
+                    data.changeTurn()
+                    data.reverse = not data.reverse
                 #スコアの確定
                 for ind in range(len(data.score)):
                     cards = data.hand_list[ind]
@@ -373,31 +534,41 @@ def main(data):
                 rank = "3rd"
             else:
                 rank = str(data.rank) +"th"
+            data.cpus.checkSituation()
             if data.turn == 0:
-                print("あなたは " + str(data.rank) + "位です。 In " + rank + " place is YOU!!!!!!!")
-            else:
-                print("Player " + str(data.turn) + " の勝ち! In" + rank + " place is Player" + str(data.turn))
-            data.rank += 1
-            if data.rank == (data.player_num + 1):
-                print("負けました。 You lose...")
-                data.turn = 0
-            if (not data.rule["after_decide"]) or (data.turn == 0):
-                print("次のゲームへ進む場合はRを選んでください。 Select \'R\' to restart.")
+                print("\n🎉あなたは " + str(data.rank) + "位です。 In " + rank + " place is YOU!!!!!!!")
+                data.cpus.actRecieve(0.1)
+                data.cpus.makeLine()
                 break
+            else:
+                print("\n🎉Player " + str(data.turn) + " の勝ち! In " + rank + " place is Player" + str(data.turn))
+                data.cpus.actRecieve(0.9, data.turn)
+                data.cpus.makeLine(data.turn)
+                if data.rank == (data.player_num):
+                    print("負けました。 You lose...")
+                    data.turn = 0
+            if (not data.r_after_decide) or (data.turn == 0):
+                break
+            data.rank += 1
         elif remain == 1:
-            if data.turn == 0 and (data.uno == False):
-                print("UNO と言い忘れたので1枚引きます。 You Forgot to say \'UNO\'! Draw.")
-                data.drawDeck()
-                print("Get " + str(hand[-1]))
-            elif data.turn !=0:
-                print("UNO!!")
-                data.uno = True
+            if data.turn == 0:
+                if data.uno == False:
+                    print("UNO と言い忘れたので1枚引きます。 Forgot to say \'UNO\'! Draw.")
+                    data.drawDeck()
+                    print("Get " + str(hand[-1]))
+            else:
+                if data.uno == True:
+                    print("Uno!")
+                else:
+                    data.cpus.actRecieve(0.2, data.turn)
+                    print("Player " + str(data.turn) + " : やってしまったのです。")
+                    print("UNO と言い忘れたので1枚引きます。 Forgot to say \'UNO\'! Draw.")
         else:
             print("  残り (remain) : " + str(remain))
 
         #カード効果の発動（説明）
-        if effect != "":
-            print(effect)
+        if describe != "":
+            print(describe)
 
         #ターン変更
         data.uno = False
@@ -406,16 +577,17 @@ def main(data):
     return data.score
 
 if __name__ == "__main__":
-    conf_data = Config()
-    i = selector("C: 設定 (Setting), Space: スタート (Start), Q: やめる (Exit) ->", {"C"," ","Q"})
+    conf_data = ConfigArgs()
+    cpus = CpuManager(conf_data.player_num-1)
+    i = selector("Space: スタート (Start), C: 設定 (Setting), Q: やめる (Exit) ->", {" ","C","Q"})
     while i != "Q":
         if i == "C":
-            config(conf_data)
-            i = selector("C: 設定 (Setting), Space: スタート (Start), Q: やめる (Exit) ->", {"C"," ","Q"})
-        elif i == " " or (i == "R"):
+            config(conf_data, cpus)
+            i = selector("Space: スタート (Start), C: 設定 (Setting), Q: やめる (Exit) ->", {" ","C","Q"})
+        elif i == " ":
             print("🌈 = wild card")
             print("Game Start!")
-            play_data = Play(conf_data)
+            play_data = UnoPlay(conf_data,cpus)
 
             conf_data.score = main(play_data)
 
@@ -424,8 +596,8 @@ if __name__ == "__main__":
                 print("Player" + str(ind +1) + " : " + str(pt) + "Pt")
             print("*設定を変更すると途中のデータ, スコアは破棄されます。*")
             print("*If the setting is changed, data in progress will be discarded.*")
-            i = selector("C: 設定 (Setting), E: 戻る (Continue), R: 次へ (Next game), Q: やめる (Exit) ->",{"C","E","R","Q"})
-        elif i == "E":
+            i = selector("Z: 戻る (Continue), Space: 次へ (Next game), C: 設定 (Setting), Q: やめる (Exit) ->",{"Z"," ","C","Q"})
+        elif i == "Z":
 
             conf_data.score = main(play_data)
 
@@ -434,4 +606,4 @@ if __name__ == "__main__":
                 print("Player" + str(ind +1) + " : " + str(pt) + "Pt")
             print("*設定を変更すると途中のデータは破棄されます。*")
             print("*If the setting is changed, data in progress will be discarded.*")
-            i = selector("C: 設定 (Setting), E: 戻る (Continue), R: 次へ (Next game), Q: やめる (Exit) ->",{"C","E","R","Q"})
+            i = selector("Z: 戻る (Continue), Space: 次へ (Next game), C: 設定 (Setting), Q: やめる (Exit) ->",{"Z"," ","C","Q"})
