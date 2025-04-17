@@ -59,7 +59,7 @@ class UnoCpu(AI):
             else:
                 act = "ふあぁあ"
         elif self.now == 4:
-            act = "ふぅ。"
+            act = "よかった、なんとかなりそうだ。"
         elif self.now == 5:
             act = "ど、どうしよう、、。"
         elif self.now == 6:
@@ -71,7 +71,7 @@ class UnoCpu(AI):
             if self.pattern[1]>0.3:
                 act = "やった!"
         elif self.now == 9:
-            act = "ほぇえ。"
+            act = "お見事！"
         elif self.now == 10:
             if self.pattern[1]>0.5:
                 act = "面白いね。"
@@ -82,7 +82,7 @@ class UnoCpu(AI):
         elif self.now == 12:
             act = "この～！"
         elif self.now == 13:
-            act = "ドキドキ"
+            act = "うまくやれるだろうか。"
         elif self.now == 14:
             act = "ええっ！"
         return act
@@ -211,8 +211,7 @@ class UnoPlay():
             return inp
         else:
             print("you can't chose it.")
-            selector(question, select)
-            return inp
+            return selector(question, select)
 
     def changeTurn(self):
         """ターンを一つ回す
@@ -534,7 +533,7 @@ def main(data):
                 rank = "3rd"
             else:
                 rank = str(data.rank) +"th"
-            data.cpus.checkSituation()
+            data.cpus.checkSituation(data.hand_list,data.score)
             if data.turn == 0:
                 print("\n🎉あなたは " + str(data.rank) + "位です。 In " + rank + " place is YOU!!!!!!!")
                 data.cpus.actRecieve(0.1)
